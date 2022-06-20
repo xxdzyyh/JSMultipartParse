@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no"
+    />
+    <title>js错误测试</title>
+    <script type="text/javascript"></script>
+    <script type="text/javascript" src="./pako_inflate_2.0.4.js"></script>
+    <script type="text/javascript" src="./gunzip.min.js"></script>
+    <style type="text/css">
+      h1 {
+        color: red;
+        font-size: 20;
+      }
+
+      p {
+        color: blue;
+        font-size: 20;
+      }
+    </style>
+  </head>
+
+  <body>
+    <p>multipart 解析测试</p>
+    <input id="file" type="file" />
+    <input id="gzip" type="file">选择GZip文件</input>
+    <div id="images"></div>
+    <script>
+      var gzipInput = document.getElementById("gzip");
+      gzipInput.onchange = function () {
+        var file = gzipInput.files[0];
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          var gzip = e.target.result;
+          var gunzip = new Zlib.Gunzip(new Uint8Array(gzip));
+          var inflate = gunzip.decompress();
+          console.log('inflate',inflate);
+          const multipartBodyBuffer = new Int8Array(inflate);
+            console.log(multipartBodyBuffer);
+            let uniqueId = "b23f035a3e9e453f";
+            const boundary = "Boundary-" + uniqueId;
+            // multipart 解析逻辑参考 https://github.com/GALCF/parse-multipart
+            // 因为浏览器环境没有 Buffer 类型，所以将 Buffer 改成了 Array
+            let lastline = [];
+            let header = "";
+            let info = "";
+            let state = 0;
+            let buffer = [];
+            let allParts = [];
+            let fieldInfo = "";
+            const int8ArrayToString = function (obj) {
+              return obj
+                .map((item) => {
+                  return String.fromCharCode(item);
+                })
+                .join("");
+            };
+            const process = (part) => {
+              const obj = (str) => {
+                const k = str.split("=");
+                const a = k[0].trim();
+                const b = JSON.parse(k[1].trim());
+                const o = {};
+                Object.defineProperty(o, a, {
+                  value: b,
+                  writable: true,
+                  enumerable: true,
+                  configurable: true,
+                });
+                return o;
+              };
+              const header = part.header.split(";");
+              const file = obj(header[2]);
+              let offset = file.filename.split(".")[0].split("-").slice(-1)[0];
+              file["offset"] = parseInt(offset) / 1000;
+              file["url"] = window.URL.createObjectURL(
+                new Blob([Uint8Array.from(part.part).buffer], {
+                  type: "image/webp",
+                })
+              );
+
+              let img = document.createElement("img");
+              img.setAttribute("src", file.url);
+              document.getElementById("images").appendChild(img);
+
+              return file;
+            };
+            for (let i = 0; i < multipartBodyBuffer.length; i++) {
+              const oneByte = multipartBodyBuffer[i];
+              const prevByte = i > 0 ? multipartBodyBuffer[i - 1] : null;
+              const newLineDetected = oneByte === 0x0a && prevByte === 0x0d;
+              const newLineChar = oneByte === 0x0a || oneByte === 0x0d;
+              if (!newLineChar) {
+                lastline[lastline.length] = oneByte;
+              }
+              if (0 === state && newLineDetected) {
+                if ("--" + boundary == int8ArrayToString(lastline)) {
+                  state = 1;
+                }
+                lastline = [];
+              } else if (1 === state && newLineDetected) {
+                header = int8ArrayToString(lastline);
+                state = 2;
+                lastline = [];
+              } else if (2 === state && newLineDetected) {
+                info = int8ArrayToString(lastline);
+                state = 3;
+                lastline = [];
+              } else if (3 === state && newLineDetected) {
+                fieldInfo = int8ArrayToString(lastline);
+                state = 4;
+                buffer = [];
+                lastline = [];
+              } else if (4 === state) {
+                if (lastline.length > boundary.length + 4) {
+                  // mem save
+                  lastline = [];
+                }
+                if ("--" + boundary === int8ArrayToString(lastline)) {
+                  const j = buffer.length - lastline.length;
+                  const part = buffer.slice(0, j - 1);
+                  const p = {
+                    header: header,
+                    info: info,
+                    part: part,
+                    fieldInfo: fieldInfo,
+                  };
+                  allParts.push(process(p));
+                  buffer = [];
+                  lastline = [];
+                  state = 5;
+                  header = "";
+                  info = "";
+                } else {
+                  buffer.push(oneByte);
+                }
+                if (newLineDetected) {
+                  lastline = [];
+                }
+              } else if (5 === state) {
+                if (newLineDetected) {
+                  state = 1;
+                }
+              }
+            }
+            console.log("allParts", allParts);
+
+        };
+        reader.readAsArrayBuffer(file);
+      };
+    
+
+      var input = document.getElementById("file");
+      input.onchange = function () {
+        var file = this.files[0];
+        console.log(file)
+        if (!!file) {
+          //读取本地文件，以gbk编码方式输出
+          var reader = new FileReader();
+          reader.readAsArrayBuffer(file);
+          reader.onload = function () {
+            //读取完毕后输出结果
+            var blob = this.result;
+            const multipartBodyBuffer = new Int8Array(blob);
+            console.log(multipartBodyBuffer);
+            let uniqueId = "b23f035a3e9e453f";
+            const boundary = "Boundary-" + uniqueId;
+            // multipart 解析逻辑参考 https://github.com/GALCF/parse-multipart
+            // 因为浏览器环境没有 Buffer 类型，所以将 Buffer 改成了 Array
+            let lastline = [];
+            let header = "";
+            let info = "";
+            let state = 0;
+            let buffer = [];
+            let allParts = [];
+            let fieldInfo = "";
+            const int8ArrayToString = function (obj) {
+              return obj
+                .map((item) => {
+                  return String.fromCharCode(item);
+                })
+                .join("");
+            };
+            const process = (part) => {
+              const obj = (str) => {
+                const k = str.split("=");
+                const a = k[0].trim();
+                const b = JSON.parse(k[1].trim());
+                const o = {};
+                Object.defineProperty(o, a, {
+                  value: b,
+                  writable: true,
+                  enumerable: true,
+                  configurable: true,
+                });
+                return o;
+              };
+              const header = part.header.split(";");
+              const file = obj(header[2]);
+              let offset = file.filename.split(".")[0].split("-").slice(-1)[0];
+              file["offset"] = parseInt(offset) / 1000;
+              file["url"] = window.URL.createObjectURL(
+                new Blob([Uint8Array.from(part.part).buffer], {
+                  type: "image/webp",
+                })
+              );
+
+              let img = document.createElement("img");
+              img.setAttribute("src", file.url);
+              document.getElementById("images").appendChild(img);
+
+              return file;
+            };
+            for (let i = 0; i < multipartBodyBuffer.length; i++) {
+              const oneByte = multipartBodyBuffer[i];
+              const prevByte = i > 0 ? multipartBodyBuffer[i - 1] : null;
+              const newLineDetected = oneByte === 0x0a && prevByte === 0x0d;
+              const newLineChar = oneByte === 0x0a || oneByte === 0x0d;
+              if (!newLineChar) {
+                lastline[lastline.length] = oneByte;
+              }
+              if (0 === state && newLineDetected) {
+                if ("--" + boundary == int8ArrayToString(lastline)) {
+                  state = 1;
+                }
+                lastline = [];
+              } else if (1 === state && newLineDetected) {
+                header = int8ArrayToString(lastline);
+                state = 2;
+                lastline = [];
+              } else if (2 === state && newLineDetected) {
+                info = int8ArrayToString(lastline);
+                state = 3;
+                lastline = [];
+              } else if (3 === state && newLineDetected) {
+                fieldInfo = int8ArrayToString(lastline);
+                state = 4;
+                buffer = [];
+                lastline = [];
+              } else if (4 === state) {
+                if (lastline.length > boundary.length + 4) {
+                  // mem save
+                  lastline = [];
+                }
+                if ("--" + boundary === int8ArrayToString(lastline)) {
+                  const j = buffer.length - lastline.length;
+                  const part = buffer.slice(0, j - 1);
+                  const p = {
+                    header: header,
+                    info: info,
+                    part: part,
+                    fieldInfo: fieldInfo,
+                  };
+                  allParts.push(process(p));
+                  buffer = [];
+                  lastline = [];
+                  state = 5;
+                  header = "";
+                  info = "";
+                } else {
+                  buffer.push(oneByte);
+                }
+                if (newLineDetected) {
+                  lastline = [];
+                }
+              } else if (5 === state) {
+                if (newLineDetected) {
+                  state = 1;
+                }
+              }
+            }
+            console.log("allParts", allParts);
+          };
+        }
+      };
+    </script>
+  </body>
+</html>
