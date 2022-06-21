@@ -10,4 +10,4 @@
 
 ## multipart 解析
 
-浏览器环境
+浏览器环境和 node.js 环境还是不同的，有些东西浏览器没有，但是浏览器有ArrayBuffer、Uint8Array,那问题就不大，照着 node.js 环境的代码将浏览器不支持的东西替换掉就可以。
